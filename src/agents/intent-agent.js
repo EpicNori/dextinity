@@ -75,6 +75,6 @@ Analyze what type of game this is and what the improvement intent is.`;
       this.narrate(`Got it! This is a ${result.gameType || 'custom'} game called "${result.gameTitle || 'Untitled'}".`);
     }
 
-    return result;
+    return { ...input, ...result };
   }
 }

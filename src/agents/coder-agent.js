@@ -101,12 +101,28 @@ Every function must be implemented. Include actual game content and logic.`;
         plan: input.plan,
       });
 
-      if (result.files) {
+      if (result.files && Array.isArray(result.files)) {
         allFiles.push(...result.files);
+      } else {
+        // AI returned malformed response - create stub files so they aren't silently lost
+        this.narrate(`Warning: batch ${batchNum} returned unexpected format. Creating placeholder files...`);
+        for (const f of batch) {
+          allFiles.push({
+            path: f.path,
+            scriptType: f.scriptType,
+            luau: `-- Code generation failed for this file. Please re-generate.\n-- File: ${f.path}\n-- Description: ${f.description || 'N/A'}`,
+            antigravity: '',
+            description: f.description || '',
+          });
+        }
       }
     }
 
-    this.narrate(`Done coding! Wrote ${allFiles.length} files with real, functional code.`);
+    if (allFiles.length === 0 && fileManifest.length > 0) {
+      this.narrate(`Warning: No files were generated from ${fileManifest.length} planned files.`);
+    } else {
+      this.narrate(`Done coding! Wrote ${allFiles.length} files with real, functional code.`);
+    }
 
     return { ...input, files: allFiles };
   }

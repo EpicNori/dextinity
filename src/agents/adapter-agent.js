@@ -84,7 +84,7 @@ If a file is fine, include it unchanged with an empty issues array.`;
 
       const result = await this.callAI(userMessage);
 
-      if (result.files) {
+      if (result.files && Array.isArray(result.files)) {
         // Merge antigravity source from original files
         for (const adapted of result.files) {
           const original = batch.find(f => f.path === adapted.path);
@@ -93,6 +93,10 @@ If a file is fine, include it unchanged with an empty issues array.`;
           }
           allAdapted.push(adapted);
         }
+      } else {
+        // AI returned malformed response - keep original files rather than losing them
+        this.narrate(`Warning: adapter check returned unexpected format for batch. Keeping original files.`);
+        allAdapted.push(...batch);
       }
     }
 

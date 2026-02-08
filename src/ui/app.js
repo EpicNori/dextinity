@@ -510,12 +510,21 @@ class DextinityApp {
   // ==== Output Rendering ====
 
   _renderOutput(project) {
+    const files = project.files || [];
+
+    if (files.length === 0) {
+      // No files generated - show a clear message in the code display
+      const display = document.getElementById('code-display');
+      display.textContent = '-- No files were generated.\n-- This can happen if the AI returned an unexpected response format.\n-- Try generating again, or check the agent log for errors.';
+      this._addLog('error', 'System', 'No code files were produced. The AI may have returned an unexpected response. Try generating again.');
+      return;
+    }
+
     this._renderFileTree(project);
     this._renderStructureView(project);
     this._renderAntigravityView(project);
 
     // Auto-select first file
-    const files = project.files || [];
     if (files.length > 0) {
       this._displayFile(files[0]);
     }
