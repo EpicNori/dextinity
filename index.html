@@ -174,38 +174,65 @@
     <!-- Settings Modal -->
     <div id="modal-settings" class="modal hidden">
       <div class="modal-backdrop"></div>
-      <div class="modal-content">
+      <div class="modal-content modal-content-wide">
         <div class="modal-header">
           <h2>API Settings</h2>
           <button id="btn-close-settings" class="btn btn-icon">&times;</button>
         </div>
         <div class="modal-body">
+          <!-- Provider Grid -->
           <div class="form-group">
-            <label for="api-provider">AI Provider</label>
-            <select id="api-provider">
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="openai">OpenAI (GPT)</option>
-              <option value="custom">Custom OpenAI-compatible</option>
-            </select>
+            <label>AI Provider</label>
+            <div id="provider-grid" class="provider-grid">
+              <!-- Populated dynamically by app.js -->
+            </div>
           </div>
+
+          <!-- Provider description -->
+          <div id="provider-desc" class="provider-desc"></div>
+
+          <!-- API Key -->
           <div class="form-group">
             <label for="api-key">API Key</label>
-            <input type="password" id="api-key" placeholder="sk-...">
+            <div class="input-with-action">
+              <input type="password" id="api-key" placeholder="sk-...">
+              <button id="btn-toggle-key" class="btn btn-icon btn-small" title="Show/hide key">&#128065;</button>
+            </div>
             <p class="form-hint">Stored only in your browser's localStorage. Never sent anywhere except the AI provider.</p>
           </div>
+
+          <!-- Custom Endpoint (shown only for custom provider) -->
           <div class="form-group" id="custom-endpoint-group" style="display:none">
             <label for="api-endpoint">Custom API Endpoint</label>
             <input type="url" id="api-endpoint" placeholder="https://api.example.com/v1/chat/completions">
           </div>
+
+          <!-- Model Selection -->
           <div class="form-group">
             <label for="api-model">Model</label>
-            <input type="text" id="api-model" placeholder="claude-sonnet-4-20250514" value="claude-sonnet-4-20250514">
+            <div id="model-buttons" class="model-buttons">
+              <!-- Populated dynamically -->
+            </div>
+            <div class="model-custom-row">
+              <input type="text" id="api-model" placeholder="claude-sonnet-4-20250514" value="claude-sonnet-4-20250514">
+            </div>
+            <p id="model-context-hint" class="form-hint"></p>
           </div>
+
+          <!-- Max Iterations -->
           <div class="form-group">
             <label for="max-iterations">Max Improvement Iterations</label>
             <input type="number" id="max-iterations" value="3" min="1" max="10">
           </div>
-          <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+
+          <!-- Actions -->
+          <div class="settings-actions">
+            <button id="btn-test-connection" class="btn btn-secondary">Test Connection</button>
+            <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+          </div>
+
+          <!-- Connection test result -->
+          <div id="connection-result" class="connection-result hidden"></div>
         </div>
       </div>
     </div>

@@ -5,7 +5,7 @@
  * and manages the application state.
  */
 
-import { apiClient } from '../core/api.js';
+import { apiClient, AIApiClient, PROVIDERS } from '../core/api.js';
 import { AgentChain } from '../agents/chain.js';
 import { robloxExporter } from '../export/roblox-export.js';
 
@@ -44,19 +44,18 @@ class DextinityApp {
     document.querySelector('.modal-backdrop')?.addEventListener('click', () => this._hideSettings());
     document.getElementById('btn-save-settings').addEventListener('click', () => this._saveSettings());
 
-    // Provider change shows/hides custom endpoint
-    document.getElementById('api-provider').addEventListener('change', (e) => {
-      const customGroup = document.getElementById('custom-endpoint-group');
-      customGroup.style.display = e.target.value === 'custom' ? 'block' : 'none';
+    // Test connection
+    document.getElementById('btn-test-connection').addEventListener('click', () => this._testConnection());
 
-      // Update default model
-      const modelInput = document.getElementById('api-model');
-      if (e.target.value === 'anthropic') {
-        modelInput.value = 'claude-sonnet-4-20250514';
-      } else if (e.target.value === 'openai') {
-        modelInput.value = 'gpt-4o';
-      }
+    // Toggle API key visibility
+    document.getElementById('btn-toggle-key').addEventListener('click', () => {
+      const input = document.getElementById('api-key');
+      input.type = input.type === 'password' ? 'text' : 'password';
     });
+
+    // Build provider grid
+    this._buildProviderGrid();
+    this._buildModelButtons();
 
     // Export
     document.getElementById('btn-export').addEventListener('click', () => this._export());
@@ -112,11 +111,14 @@ class DextinityApp {
 
   _loadSettings() {
     const settings = apiClient.getSettings();
-    document.getElementById('api-provider').value = settings.provider;
+    this._selectedProvider = settings.provider;
     document.getElementById('api-key').value = settings.apiKey;
     document.getElementById('api-endpoint').value = settings.endpoint || '';
     document.getElementById('api-model').value = settings.model;
     document.getElementById('max-iterations').value = settings.maxIterations;
+
+    this._updateProviderSelection(settings.provider);
+    this._buildModelButtons();
 
     if (settings.provider === 'custom') {
       document.getElementById('custom-endpoint-group').style.display = 'block';
@@ -126,6 +128,143 @@ class DextinityApp {
     if (!settings.apiKey) {
       this._addLog('system', 'System', 'No API key configured. Click the gear icon to add one.');
     }
+  }
+
+  // ==== Provider Grid & Model UI ====
+
+  _buildProviderGrid() {
+    const grid = document.getElementById('provider-grid');
+    const providers = AIApiClient.getProviders();
+
+    grid.innerHTML = providers.map(p => `
+      <div class="provider-card" data-provider="${p.id}">
+        <span class="provider-dot" style="background: ${p.color}"></span>
+        <span class="provider-name">${this._escapeHtml(p.name)}</span>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('.provider-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const providerId = card.dataset.provider;
+        this._selectedProvider = providerId;
+        this._updateProviderSelection(providerId);
+
+        // Update model to provider default
+        const provider = PROVIDERS[providerId];
+        if (provider && provider.defaultModel) {
+          document.getElementById('api-model').value = provider.defaultModel;
+        }
+
+        // Update API key placeholder
+        if (provider) {
+          document.getElementById('api-key').placeholder = provider.keyPlaceholder;
+        }
+
+        // Show/hide custom endpoint
+        document.getElementById('custom-endpoint-group').style.display =
+          providerId === 'custom' ? 'block' : 'none';
+
+        // Rebuild model buttons for this provider
+        this._buildModelButtons();
+
+        // Update context window hint
+        this._updateContextHint();
+
+        // Hide previous connection result
+        document.getElementById('connection-result').classList.add('hidden');
+      });
+    });
+  }
+
+  _updateProviderSelection(providerId) {
+    document.querySelectorAll('.provider-card').forEach(card => {
+      card.classList.toggle('selected', card.dataset.provider === providerId);
+    });
+
+    const provider = PROVIDERS[providerId];
+    const desc = document.getElementById('provider-desc');
+    if (provider) {
+      desc.textContent = provider.description;
+    }
+  }
+
+  _buildModelButtons() {
+    const container = document.getElementById('model-buttons');
+    const providerId = this._selectedProvider || apiClient.getSettings().provider;
+    const provider = PROVIDERS[providerId];
+
+    if (!provider || !provider.models || provider.models.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const currentModel = document.getElementById('api-model').value;
+
+    container.innerHTML = provider.models.map(m => {
+      const isActive = m.id === currentModel;
+      const dot = m.recommended ? '<span class="recommended-dot"></span>' : '';
+      return `<button class="model-btn ${isActive ? 'active' : ''}" data-model="${m.id}">${this._escapeHtml(m.name)}${dot}</button>`;
+    }).join('');
+
+    container.querySelectorAll('.model-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('api-model').value = btn.dataset.model;
+        container.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this._updateContextHint();
+      });
+    });
+
+    this._updateContextHint();
+  }
+
+  _updateContextHint() {
+    const hint = document.getElementById('model-context-hint');
+    const providerId = this._selectedProvider || apiClient.getSettings().provider;
+    const provider = PROVIDERS[providerId];
+    if (provider && provider.maxContextWindow) {
+      const ctx = provider.maxContextWindow >= 1000000
+        ? `${(provider.maxContextWindow / 1000000).toFixed(1)}M`
+        : `${Math.round(provider.maxContextWindow / 1000)}K`;
+      hint.textContent = `Context window: ~${ctx} tokens`;
+    } else {
+      hint.textContent = '';
+    }
+  }
+
+  async _testConnection() {
+    const resultEl = document.getElementById('connection-result');
+    const btn = document.getElementById('btn-test-connection');
+
+    // Temporarily save settings for the test
+    this._applySettingsToClient();
+
+    resultEl.className = 'connection-result testing';
+    resultEl.textContent = 'Testing connection...';
+    resultEl.classList.remove('hidden');
+    btn.disabled = true;
+
+    const result = await apiClient.testConnection();
+
+    btn.disabled = false;
+
+    if (result.ok) {
+      resultEl.className = 'connection-result success';
+      resultEl.textContent = `Connected! Model: ${result.model} | Latency: ${result.latencyMs}ms | Response: "${result.response}"`;
+    } else {
+      resultEl.className = 'connection-result failure';
+      resultEl.textContent = `Failed: ${result.error}`;
+    }
+  }
+
+  _applySettingsToClient() {
+    apiClient.saveSettings({
+      provider: this._selectedProvider || 'anthropic',
+      apiKey: document.getElementById('api-key').value,
+      endpoint: document.getElementById('api-endpoint').value,
+      model: document.getElementById('api-model').value,
+      maxIterations: parseInt(document.getElementById('max-iterations').value) || 3,
+    });
   }
 
   // ==== Mode Switching ====
@@ -157,15 +296,12 @@ class DextinityApp {
   }
 
   _saveSettings() {
-    apiClient.saveSettings({
-      provider: document.getElementById('api-provider').value,
-      apiKey: document.getElementById('api-key').value,
-      endpoint: document.getElementById('api-endpoint').value,
-      model: document.getElementById('api-model').value,
-      maxIterations: parseInt(document.getElementById('max-iterations').value) || 3,
-    });
+    this._applySettingsToClient();
     this._hideSettings();
-    this._addLog('system', 'System', 'Settings saved successfully.');
+
+    const provider = PROVIDERS[this._selectedProvider];
+    const name = provider?.name || 'Custom';
+    this._addLog('system', 'System', `Settings saved. Provider: ${name} | Model: ${apiClient.getSettings().model}`);
   }
 
   // ==== File Upload ====
