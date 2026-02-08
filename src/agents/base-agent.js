@@ -48,7 +48,7 @@ export class BaseAgent {
     if (contextKeys.length > 0) {
       // Truncate very large context objects to avoid exceeding token limits
       const contextJson = JSON.stringify(context, null, 2);
-      const maxContextChars = 50000;
+      const maxContextChars = 20000;
       contextStr = contextJson.length > maxContextChars
         ? `\n\nContext from previous agents (truncated):\n${contextJson.substring(0, maxContextChars)}...\n[truncated]`
         : `\n\nContext from previous agents:\n${contextJson}`;
