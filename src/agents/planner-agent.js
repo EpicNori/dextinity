@@ -77,7 +77,7 @@ Complexity: ${input.complexity}
 Break this down into specific Roblox systems with clear responsibilities and data flow.
 Make sure every system is accounted for and nothing critical is missing.`;
 
-    const result = await this.callAI(userMessage, { intent: input });
+    const result = await this.callAI(userMessage);
 
     if (result.narration) {
       this.narrate(result.narration);
