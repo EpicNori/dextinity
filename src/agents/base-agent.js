@@ -43,9 +43,16 @@ export class BaseAgent {
    * @returns {Promise<object>} Parsed JSON response
    */
   async callAI(userMessage, context = {}) {
-    const contextStr = Object.keys(context).length > 0
-      ? `\n\nContext from previous agents:\n${JSON.stringify(context, null, 2)}`
-      : '';
+    const contextKeys = Object.keys(context);
+    let contextStr = '';
+    if (contextKeys.length > 0) {
+      // Truncate very large context objects to avoid exceeding token limits
+      const contextJson = JSON.stringify(context, null, 2);
+      const maxContextChars = 50000;
+      contextStr = contextJson.length > maxContextChars
+        ? `\n\nContext from previous agents (truncated):\n${contextJson.substring(0, maxContextChars)}...\n[truncated]`
+        : `\n\nContext from previous agents:\n${contextJson}`;
+    }
 
     const messages = [
       {
@@ -61,30 +68,66 @@ export class BaseAgent {
       temperature: 0.7,
     });
 
+    if (!result || !result.content) {
+      this.narrate('Warning: AI returned empty response, retrying may help.');
+      return { raw: '' };
+    }
+
     return this._parseResponse(result.content);
   }
 
   /**
    * Parse AI response, extracting JSON if present.
+   * Uses multiple strategies: fenced JSON block, raw JSON, brace extraction.
    */
   _parseResponse(content) {
-    // Try to extract JSON from the response
+    if (!content || typeof content !== 'string') {
+      return { raw: content || '' };
+    }
+
+    // Strategy 1: Extract JSON from ```json ... ``` fenced block
     const jsonMatch = content.match(/```json\s*([\s\S]*?)```/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[1].trim());
       } catch (e) {
-        // Fall through to try raw parse
+        // Fall through to next strategy
       }
     }
 
-    // Try to parse the entire response as JSON
-    try {
-      return JSON.parse(content);
-    } catch (e) {
-      // Return as wrapped text
-      return { raw: content };
+    // Strategy 2: Extract JSON from ``` ... ``` (without json label)
+    const codeMatch = content.match(/```\s*([\s\S]*?)```/);
+    if (codeMatch) {
+      try {
+        const candidate = codeMatch[1].trim();
+        if (candidate.startsWith('{') || candidate.startsWith('[')) {
+          return JSON.parse(candidate);
+        }
+      } catch (e) {
+        // Fall through
+      }
     }
+
+    // Strategy 3: Try to parse the entire response as JSON
+    try {
+      return JSON.parse(content.trim());
+    } catch (e) {
+      // Fall through
+    }
+
+    // Strategy 4: Find the outermost { ... } in the response
+    const firstBrace = content.indexOf('{');
+    const lastBrace = content.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(content.substring(firstBrace, lastBrace + 1));
+      } catch (e) {
+        // Fall through
+      }
+    }
+
+    // All strategies failed - return as wrapped text
+    return { raw: content };
   }
 
   /**

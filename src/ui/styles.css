@@ -385,6 +385,8 @@ textarea::placeholder { color: var(--text-muted); }
 .agent-node.active .agent-status { color: var(--accent-blue); }
 .agent-node.done .agent-status { color: var(--accent-green); }
 .agent-node.error .agent-status { color: var(--accent-red); }
+.agent-node.skipped { opacity: 0.45; }
+.agent-node.skipped .agent-status { color: var(--text-muted); font-style: italic; }
 
 .agent-connector {
   width: 2px;
@@ -904,4 +906,85 @@ textarea::placeholder { color: var(--text-muted); }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* ===== Monitoring Bar ===== */
+
+.monitor-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.monitor-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.monitor-label {
+  color: var(--text-muted);
+}
+
+.monitor-value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+}
+
+.monitor-progress-container {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.monitor-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-blue);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  font-size: 9px;
+  color: white;
+  text-align: center;
+  line-height: 6px;
+}
+
+/* ===== Generate/Stop Row ===== */
+
+.generate-row {
+  display: flex;
+  gap: 8px;
+}
+
+.generate-row .btn-large {
+  flex: 1;
+}
+
+.btn-danger {
+  background: var(--accent-red);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.btn-danger:hover {
+  background: #da3633;
+}
+
+.hidden {
+  display: none !important;
 }

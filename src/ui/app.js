@@ -2,7 +2,7 @@
  * Dextinity - Main Application
  *
  * Wires up the UI to the agent chain, handles user interaction,
- * and manages the application state.
+ * and manages the application state including monitoring display.
  */
 
 import { apiClient, AIApiClient, PROVIDERS } from '../core/api.js';
@@ -14,6 +14,7 @@ class DextinityApp {
     this.project = null;
     this.uploadedFiles = [];
     this.chain = null;
+    this._monitorInterval = null;
 
     this._initUI();
     this._initChain();
@@ -37,6 +38,9 @@ class DextinityApp {
 
     // Generate button
     document.getElementById('btn-generate').addEventListener('click', () => this._generate());
+
+    // Stop button
+    document.getElementById('btn-stop')?.addEventListener('click', () => this._stopGeneration());
 
     // Settings
     document.getElementById('btn-settings').addEventListener('click', () => this._showSettings());
@@ -102,10 +106,13 @@ class DextinityApp {
       onAgentStart: (id) => this._onAgentStart(id),
       onAgentDone: (id) => this._onAgentDone(id),
       onAgentError: (id, err) => this._onAgentError(id, err),
+      onAgentSkipped: (id) => this._onAgentSkipped(id),
       onNarrate: (entry) => this._onNarrate(entry),
       onChainStart: () => this._onChainStart(),
       onChainDone: (result) => this._onChainDone(result),
       onChainError: (err) => this._onChainError(err),
+      onProgress: (progress) => this._onProgress(progress),
+      onMonitorUpdate: (data) => this._onMonitorUpdate(data),
     });
   }
 
@@ -337,18 +344,26 @@ class DextinityApp {
 
   _renderUploadedFiles() {
     const container = document.getElementById('uploaded-files');
-    container.innerHTML = this.uploadedFiles.map((f, i) => `
-      <div class="uploaded-file">
-        <span>${f.name} (${(f.size / 1024).toFixed(1)}KB)</span>
-        <button class="remove-file" data-index="${i}">&times;</button>
-      </div>
-    `).join('');
+    container.innerHTML = '';
 
-    container.querySelectorAll('.remove-file').forEach(btn => {
+    this.uploadedFiles.forEach((f, i) => {
+      const div = document.createElement('div');
+      div.className = 'uploaded-file';
+
+      const span = document.createElement('span');
+      span.textContent = `${f.name} (${(f.size / 1024).toFixed(1)}KB)`;
+      div.appendChild(span);
+
+      const btn = document.createElement('button');
+      btn.className = 'remove-file';
+      btn.innerHTML = '&times;';
       btn.addEventListener('click', () => {
-        this.uploadedFiles.splice(parseInt(btn.dataset.index), 1);
+        this.uploadedFiles.splice(i, 1);
         this._renderUploadedFiles();
       });
+      div.appendChild(btn);
+
+      container.appendChild(div);
     });
   }
 
@@ -392,10 +407,15 @@ class DextinityApp {
       uploadedFiles: activeMode === 'upload' ? this.uploadedFiles : undefined,
     };
 
-    // Disable generate button
-    const btn = document.getElementById('btn-generate');
-    btn.disabled = true;
-    btn.textContent = 'Generating...';
+    // Toggle button visibility
+    const genBtn = document.getElementById('btn-generate');
+    const stopBtn = document.getElementById('btn-stop');
+    genBtn.disabled = true;
+    genBtn.textContent = 'Generating...';
+    if (stopBtn) stopBtn.classList.remove('hidden');
+
+    // Start elapsed time display
+    this._startMonitorTimer();
 
     try {
       if (activeMode === 'upload' && this.uploadedFiles.length > 0) {
@@ -407,8 +427,17 @@ class DextinityApp {
       // Error already handled by chain callbacks
       console.error('Generation failed:', err);
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Generate Game';
+      genBtn.disabled = false;
+      genBtn.textContent = 'Generate Game';
+      if (stopBtn) stopBtn.classList.add('hidden');
+      this._stopMonitorTimer();
+    }
+  }
+
+  _stopGeneration() {
+    if (this.chain && this.chain.isRunning) {
+      this.chain.stop();
+      this._addLog('system', 'System', 'Stopping generation...');
     }
   }
 
@@ -417,7 +446,7 @@ class DextinityApp {
   _onChainStart() {
     // Reset all agent nodes
     document.querySelectorAll('.agent-node').forEach(node => {
-      node.classList.remove('active', 'done', 'error');
+      node.classList.remove('active', 'done', 'error', 'skipped');
       node.querySelector('.agent-status').textContent = 'waiting';
     });
     document.querySelectorAll('.agent-connector').forEach(c => {
@@ -427,11 +456,15 @@ class DextinityApp {
     const badge = document.getElementById('chain-status');
     badge.textContent = 'Running';
     badge.className = 'status-badge running';
+
+    // Reset monitoring display
+    this._updateMonitorDisplay(null);
   }
 
   _onAgentStart(id) {
     const node = document.querySelector(`[data-agent="${id}"]`);
     if (node) {
+      node.classList.remove('skipped');
       node.classList.add('active');
       node.querySelector('.agent-status').innerHTML = '<span class="spinner"></span>running';
     }
@@ -442,10 +475,32 @@ class DextinityApp {
     if (node) {
       node.classList.remove('active');
       node.classList.add('done');
-      node.querySelector('.agent-status').textContent = 'done';
+
+      // Show duration if available
+      const timing = this.chain?.monitor?.agentTimings?.[id];
+      const dur = timing?.durationMs;
+      const durText = dur ? ` (${this._formatDuration(dur)})` : '';
+      node.querySelector('.agent-status').textContent = `done${durText}`;
     }
 
     // Activate connector after this node
+    const connectors = document.querySelectorAll('.agent-connector');
+    const nodes = document.querySelectorAll('.agent-node');
+    const nodeArray = Array.from(nodes);
+    const idx = nodeArray.findIndex(n => n.dataset.agent === id);
+    if (idx >= 0 && idx < connectors.length) {
+      connectors[idx].classList.add('done');
+    }
+  }
+
+  _onAgentSkipped(id) {
+    const node = document.querySelector(`[data-agent="${id}"]`);
+    if (node) {
+      node.classList.add('skipped');
+      node.querySelector('.agent-status').textContent = 'skipped';
+    }
+
+    // Activate connector after skipped node
     const connectors = document.querySelectorAll('.agent-connector');
     const nodes = document.querySelectorAll('.agent-node');
     const nodeArray = Array.from(nodes);
@@ -469,6 +524,18 @@ class DextinityApp {
     this._addLog(entry.agent, entry.agentName, entry.message);
   }
 
+  _onProgress(progress) {
+    const progressBar = document.getElementById('chain-progress');
+    if (progressBar) {
+      progressBar.style.width = `${progress.percent}%`;
+      progressBar.textContent = `${progress.percent}%`;
+    }
+  }
+
+  _onMonitorUpdate(data) {
+    this._updateMonitorDisplay(data);
+  }
+
   _onChainDone(result) {
     const badge = document.getElementById('chain-status');
     badge.textContent = 'Done';
@@ -477,9 +544,20 @@ class DextinityApp {
     // Enable export
     document.getElementById('btn-export').disabled = false;
 
+    // Show final monitoring summary
+    if (result._monitor) {
+      const elapsed = this._formatDuration(result._monitor.chainElapsedMs);
+      const tokens = result._monitor.totalTokens;
+      this._addLog('system', 'System',
+        `Generation complete! ${result.files?.length || 0} files ready. ` +
+        `Elapsed: ${elapsed} | Tokens: ${tokens.input + tokens.output} (${tokens.input} in, ${tokens.output} out)`
+      );
+    } else {
+      this._addLog('system', 'System', `Generation complete! ${result.files?.length || 0} files ready. Click "Export to Roblox" to download.`);
+    }
+
     // Render output
     this._renderOutput(result);
-    this._addLog('system', 'System', `Generation complete! ${result.files?.length || 0} files ready. Click "Export to Roblox" to download.`);
   }
 
   _onChainError(error) {
@@ -490,13 +568,76 @@ class DextinityApp {
     this._addLog('error', 'System', `Chain failed: ${error.message}`);
   }
 
+  // ==== Monitoring Display ====
+
+  _startMonitorTimer() {
+    this._stopMonitorTimer();
+    const elapsedEl = document.getElementById('monitor-elapsed');
+    if (!elapsedEl) return;
+
+    const startTime = performance.now();
+    this._monitorInterval = setInterval(() => {
+      const elapsed = Math.round(performance.now() - startTime);
+      elapsedEl.textContent = this._formatDuration(elapsed);
+    }, 500);
+  }
+
+  _stopMonitorTimer() {
+    if (this._monitorInterval) {
+      clearInterval(this._monitorInterval);
+      this._monitorInterval = null;
+    }
+  }
+
+  _updateMonitorDisplay(data) {
+    const tokenEl = document.getElementById('monitor-tokens');
+    const progressBar = document.getElementById('chain-progress');
+
+    if (!data) {
+      if (tokenEl) tokenEl.textContent = '0';
+      if (progressBar) {
+        progressBar.style.width = '0%';
+        progressBar.textContent = '';
+      }
+      return;
+    }
+
+    if (tokenEl) {
+      const total = data.totalTokens.input + data.totalTokens.output;
+      tokenEl.textContent = total.toLocaleString();
+    }
+
+    if (progressBar) {
+      progressBar.style.width = `${data.percent || 0}%`;
+      progressBar.textContent = data.percent > 5 ? `${data.percent}%` : '';
+    }
+  }
+
+  _formatDuration(ms) {
+    if (ms < 1000) return `${ms}ms`;
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}m ${secs}s`;
+  }
+
   // ==== Logging ====
 
   _addLog(type, agentName, message) {
     const container = document.getElementById('log-entries');
     const entry = document.createElement('div');
-    entry.className = `log-entry log-${type}`;
-    entry.innerHTML = `<span class="log-agent-name">[${agentName}]</span> ${this._escapeHtml(message)}`;
+    entry.className = `log-entry log-${this._escapeHtml(type)}`;
+
+    const agentSpan = document.createElement('span');
+    agentSpan.className = 'log-agent-name';
+    agentSpan.textContent = `[${agentName}]`;
+
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = ` ${message}`;
+
+    entry.appendChild(agentSpan);
+    entry.appendChild(msgSpan);
     container.appendChild(entry);
     container.scrollTop = container.scrollHeight;
   }

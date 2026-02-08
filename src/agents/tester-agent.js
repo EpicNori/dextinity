@@ -83,35 +83,89 @@ export class TesterAgent extends BaseAgent {
 
     const files = input.files || [];
 
+    // For small projects, test all at once. For larger ones, batch and merge results.
+    const maxFilesPerBatch = 8;
+    let mergedResult;
+
+    if (files.length <= maxFilesPerBatch) {
+      mergedResult = await this._testBatch(files, input);
+    } else {
+      mergedResult = {
+        testResults: [],
+        securityAudit: [],
+        performanceNotes: [],
+        overallScore: { functionality: 0, security: 0, performance: 0, codeQuality: 0 },
+      };
+      let batchCount = 0;
+
+      for (let i = 0; i < files.length; i += maxFilesPerBatch) {
+        const batch = files.slice(i, i + maxFilesPerBatch);
+        batchCount++;
+        this.narrate(`Testing batch ${batchCount}: ${batch.map(f => f.path.split('/').pop()).join(', ')}`);
+
+        const batchResult = await this._testBatch(batch, input);
+
+        mergedResult.testResults.push(...(batchResult.testResults || []));
+        mergedResult.securityAudit.push(...(batchResult.securityAudit || []));
+        mergedResult.performanceNotes.push(...(batchResult.performanceNotes || []));
+
+        // Accumulate scores for averaging
+        if (batchResult.overallScore) {
+          mergedResult.overallScore.functionality += Number(batchResult.overallScore.functionality) || 0;
+          mergedResult.overallScore.security += Number(batchResult.overallScore.security) || 0;
+          mergedResult.overallScore.performance += Number(batchResult.overallScore.performance) || 0;
+          mergedResult.overallScore.codeQuality += Number(batchResult.overallScore.codeQuality) || 0;
+        }
+      }
+
+      // Average out scores across batches
+      if (batchCount > 1) {
+        mergedResult.overallScore.functionality = Math.round(mergedResult.overallScore.functionality / batchCount);
+        mergedResult.overallScore.security = Math.round(mergedResult.overallScore.security / batchCount);
+        mergedResult.overallScore.performance = Math.round(mergedResult.overallScore.performance / batchCount);
+        mergedResult.overallScore.codeQuality = Math.round(mergedResult.overallScore.codeQuality / batchCount);
+      }
+    }
+
+    const fails = (mergedResult.testResults || []).filter(t => t.status === 'fail').length;
+    const warns = (mergedResult.testResults || []).filter(t => t.status === 'warn').length;
+    const vulns = (mergedResult.securityAudit || []).length;
+    this.narrate(
+      `Testing done! ${fails} failures, ${warns} warnings, ${vulns} security findings. ` +
+      `Scores: func=${mergedResult.overallScore?.functionality}/10, ` +
+      `security=${mergedResult.overallScore?.security}/10, ` +
+      `perf=${mergedResult.overallScore?.performance}/10`
+    );
+
+    return { ...input, testResults: mergedResult };
+  }
+
+  async _testBatch(files, input) {
+    const fileList = files.map(f => `=== ${f.path} (${f.scriptType}) ===\n${f.luau}\n`).join('\n');
+
     const userMessage = `Test this Roblox game by simulating player scenarios:
 
 Game: ${input.gameTitle} (${input.gameType})
 Core Loop: ${input.coreLoop}
 
 Files in the project:
-${files.map(f => `=== ${f.path} (${f.scriptType}) ===
-${f.luau}
-`).join('\n')}
+${fileList}
 
 Run through all test scenarios. Be thorough - check for bugs, exploits, and performance issues.
 Score the game honestly. Identify real problems that would affect players.`;
 
     const result = await this.callAI(userMessage);
 
-    if (result.narration) {
-      this.narrate(result.narration);
-    } else {
-      const fails = (result.testResults || []).filter(t => t.status === 'fail').length;
-      const warns = (result.testResults || []).filter(t => t.status === 'warn').length;
-      const vulns = (result.securityAudit || []).length;
-      this.narrate(
-        `Testing done! ${fails} failures, ${warns} warnings, ${vulns} security findings. ` +
-        `Scores: func=${result.overallScore?.functionality}/10, ` +
-        `security=${result.overallScore?.security}/10, ` +
-        `perf=${result.overallScore?.performance}/10`
-      );
+    // Validate we got proper test results structure
+    if (!result.testResults && !result.securityAudit) {
+      return {
+        testResults: [{ scenario: 'Parse error', status: 'warn', details: 'Tester returned unexpected format', affectedFiles: [], fix: 'Re-run generation' }],
+        securityAudit: [],
+        performanceNotes: [],
+        overallScore: result.overallScore || { functionality: 5, security: 5, performance: 5, codeQuality: 5 },
+      };
     }
 
-    return { ...input, testResults: result };
+    return result;
   }
 }

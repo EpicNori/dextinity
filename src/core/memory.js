@@ -98,11 +98,21 @@ export class AgentMemory {
    * Get relevant context for a new generation based on past experience.
    */
   getRelevantContext(intent) {
+    // Common words that should not trigger a match
+    const stopWords = new Set([
+      'game', 'make', 'with', 'that', 'this', 'from', 'have', 'will',
+      'what', 'when', 'where', 'which', 'about', 'been', 'would', 'could',
+      'should', 'their', 'there', 'they', 'them', 'then', 'than', 'each',
+      'were', 'some', 'like', 'want', 'need', 'good', 'very', 'also',
+      'just', 'more', 'into', 'over', 'your', 'does', 'only',
+    ]);
+
     const relevantProjects = this.data.projects
       .filter(p => {
         const intentLower = (intent || '').toLowerCase();
         const pIntentLower = (p.intent || '').toLowerCase();
-        return intentLower.split(' ').some(w => w.length > 3 && pIntentLower.includes(w));
+        const words = intentLower.split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
+        return words.some(w => pIntentLower.includes(w));
       })
       .slice(-3);
 
