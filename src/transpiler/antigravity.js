@@ -144,17 +144,23 @@ export class AntigravityTranspiler {
     // Not equal: != -> ~=
     result = result.replace(/!=/g, '~=');
 
-    // Logical operators: && -> and, || -> or, ! -> not
+    // Logical operators: && -> and, || -> or
     result = result.replace(/\s&&\s/g, ' and ');
     result = result.replace(/\s\|\|\s/g, ' or ');
-    result = result.replace(/!(\w)/g, 'not $1');
+    // Logical not: !varName -> not varName (only when preceded by space/paren/start or after operator)
+    // Avoid matching inside strings by only replacing when ! is preceded by a non-alphanumeric char
+    result = result.replace(/(^|[\s(,=])!(\w)/g, '$1not $2');
 
     return result;
   }
 
   _postProcess(code) {
-    // Clean up any double spaces introduced by transformations
-    code = code.replace(/  +/g, (match) => match); // preserve intentional indentation
+    // Remove trailing whitespace from each line
+    code = code.replace(/[ \t]+$/gm, '');
+
+    // Collapse 3+ consecutive blank lines into 2
+    code = code.replace(/\n{4,}/g, '\n\n\n');
+
     return code;
   }
 

@@ -392,7 +392,7 @@ export class AIApiClient {
       this.tokenUsage.output += data.usage.output_tokens || 0;
     }
 
-    const content = data.content
+    const content = (data.content || [])
       .filter(c => c.type === 'text')
       .map(c => c.text)
       .join('');
@@ -554,8 +554,9 @@ export class AIApiClient {
       this.tokenUsage.output += data.usage.completion_tokens || 0;
     }
 
+    const choices = data.choices || [];
     return {
-      content: data.choices[0]?.message?.content || '',
+      content: choices[0]?.message?.content || '',
       usage: {
         input: data.usage?.prompt_tokens || 0,
         output: data.usage?.completion_tokens || 0,
@@ -611,6 +612,16 @@ export class AIApiClient {
       lastError: this._lastError,
       provider: this.settings.provider,
     };
+  }
+
+  /**
+   * Reset usage stats (useful at the start of a new generation).
+   */
+  resetStats() {
+    this.requestCount = 0;
+    this.tokenUsage = { input: 0, output: 0 };
+    this._lastError = null;
+    this._lastLatencyMs = null;
   }
 }
 

@@ -72,7 +72,10 @@
             <textarea id="improve-prompt" placeholder="Optimize performance, fix bugs, add a rebirth system..."></textarea>
           </div>
 
-          <button id="btn-generate" class="btn btn-primary btn-large">Generate Game</button>
+          <div class="generate-row">
+            <button id="btn-generate" class="btn btn-primary btn-large">Generate Game</button>
+            <button id="btn-stop" class="btn btn-danger hidden">Stop</button>
+          </div>
         </div>
       </div>
 
@@ -124,6 +127,21 @@
               <div class="agent-icon">&#11088;</div>
               <div class="agent-label">Improver</div>
               <div class="agent-status">waiting</div>
+            </div>
+          </div>
+
+          <!-- Monitoring Bar -->
+          <div id="monitor-bar" class="monitor-bar">
+            <div class="monitor-item">
+              <span class="monitor-label">Elapsed:</span>
+              <span id="monitor-elapsed" class="monitor-value">--</span>
+            </div>
+            <div class="monitor-item">
+              <span class="monitor-label">Tokens:</span>
+              <span id="monitor-tokens" class="monitor-value">0</span>
+            </div>
+            <div class="monitor-progress-container">
+              <div id="chain-progress" class="monitor-progress-bar"></div>
             </div>
           </div>
 
