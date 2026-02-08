@@ -77,7 +77,19 @@ Complexity: ${input.complexity}
 Break this down into specific Roblox systems with clear responsibilities and data flow.
 Make sure every system is accounted for and nothing critical is missing.`;
 
-    const result = await this.callAI(userMessage);
+    let result = await this.callAI(userMessage);
+
+    // If JSON parsing failed (returned { raw: ... }), try to salvage structured data
+    if (result.raw && !result.systems) {
+      this.narrate('Warning: AI returned non-JSON response. Attempting to extract plan...');
+      result = this._extractPlanFromRaw(result.raw, input);
+    }
+
+    // If we still have no systems, generate a minimal plan from the input
+    if (!result.systems || result.systems.length === 0) {
+      this.narrate('Warning: No systems in AI response. Generating default plan from input...');
+      result = this._generateDefaultPlan(input);
+    }
 
     if (result.narration) {
       this.narrate(result.narration);
@@ -87,5 +99,85 @@ Make sure every system is accounted for and nothing critical is missing.`;
     }
 
     return { ...input, plan: result };
+  }
+
+  /**
+   * Try to extract a plan from raw text when JSON parsing fails.
+   * Looks for system-like patterns in the text.
+   */
+  _extractPlanFromRaw(raw, input) {
+    // The raw text might contain the plan described in prose.
+    // We can't reliably parse prose into structured data,
+    // so fall through to default plan generation.
+    return { raw, systems: [], dataFlow: [], remoteEvents: [] };
+  }
+
+  /**
+   * Generate a reasonable default plan based on game type when the AI fails.
+   */
+  _generateDefaultPlan(input) {
+    const gameType = (input.gameType || 'custom').toLowerCase();
+    const targetSystems = input.targetSystems || [];
+
+    // Core systems every game needs
+    const systems = [
+      { name: 'GameInit', type: 'server', description: 'Server initialization and game setup', dependencies: [], priority: 'core' },
+      { name: 'PlayerData', type: 'server', description: 'Player data saving/loading with DataStore', dependencies: [], priority: 'core' },
+      { name: 'UIController', type: 'client', description: 'Client-side UI management', dependencies: [], priority: 'core' },
+      { name: 'Config', type: 'shared', description: 'Shared game configuration and constants', dependencies: [], priority: 'core' },
+    ];
+
+    // Game-type specific systems
+    const typeSystemMap = {
+      simulator: [
+        { name: 'Currency', type: 'server', description: 'Currency earning and spending', dependencies: ['PlayerData'], priority: 'core' },
+        { name: 'Progression', type: 'server', description: 'Player progression and leveling', dependencies: ['PlayerData'], priority: 'core' },
+        { name: 'Rebirth', type: 'server', description: 'Rebirth/prestige system', dependencies: ['PlayerData', 'Currency'], priority: 'important' },
+        { name: 'Collection', type: 'server', description: 'Collectibles/pets system', dependencies: ['PlayerData'], priority: 'important' },
+        { name: 'Shop', type: 'server', description: 'In-game shop for purchases', dependencies: ['Currency'], priority: 'important' },
+      ],
+      obby: [
+        { name: 'Checkpoint', type: 'server', description: 'Checkpoint and spawn management', dependencies: ['PlayerData'], priority: 'core' },
+        { name: 'Stage', type: 'server', description: 'Stage/level management', dependencies: ['Checkpoint'], priority: 'core' },
+        { name: 'Timer', type: 'server', description: 'Speed-run timer system', dependencies: [], priority: 'important' },
+        { name: 'Leaderboard', type: 'server', description: 'Time-based leaderboard', dependencies: ['Timer', 'PlayerData'], priority: 'important' },
+      ],
+      tycoon: [
+        { name: 'Tycoon', type: 'server', description: 'Tycoon base and ownership', dependencies: ['PlayerData'], priority: 'core' },
+        { name: 'Income', type: 'server', description: 'Income generation system', dependencies: ['Tycoon'], priority: 'core' },
+        { name: 'Upgrades', type: 'server', description: 'Tycoon upgrades and unlocks', dependencies: ['Tycoon', 'Income'], priority: 'core' },
+        { name: 'Dropper', type: 'server', description: 'Dropper/conveyor mechanics', dependencies: ['Tycoon'], priority: 'important' },
+      ],
+    };
+
+    if (typeSystemMap[gameType]) {
+      systems.push(...typeSystemMap[gameType]);
+    }
+
+    // Add systems from targetSystems that aren't already covered
+    for (const target of targetSystems) {
+      const normalized = target.toLowerCase();
+      if (!systems.some(s => s.name.toLowerCase() === normalized)) {
+        systems.push({
+          name: target.charAt(0).toUpperCase() + target.slice(1),
+          type: ['ui', 'map', 'effects'].includes(normalized) ? 'client' : 'server',
+          description: `${target} system`,
+          dependencies: [],
+          priority: 'important',
+        });
+      }
+    }
+
+    const remoteEvents = [
+      { name: 'PlayerDataUpdate', direction: 'serverToClient', payload: 'Updated player data' },
+      { name: 'UIAction', direction: 'clientToServer', payload: 'UI button/action events' },
+    ];
+
+    return {
+      systems,
+      dataFlow: [],
+      remoteEvents,
+      narration: `Generated a default ${gameType} plan with ${systems.length} systems since AI response parsing failed.`,
+    };
   }
 }
