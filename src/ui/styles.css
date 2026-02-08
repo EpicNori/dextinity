@@ -99,7 +99,7 @@ html, body {
   border-color: var(--accent-blue);
 }
 .btn-primary:hover { background: #4090ee; }
-.btn-primary:disabled { background: var(--accent-blue); }
+.btn-primary:disabled { background: var(--accent-blue); opacity: 0.5; cursor: not-allowed; }
 
 .btn-secondary {
   background: transparent;
@@ -369,7 +369,8 @@ textarea::placeholder { color: var(--text-muted); }
 
 .agent-node.error {
   border-color: var(--accent-red);
-  background: rgba(248, 81, 73, 0.06);
+  background: rgba(248, 81, 73, 0.08);
+  box-shadow: 0 0 12px rgba(248, 81, 73, 0.2);
 }
 
 .agent-icon { font-size: 18px; flex-shrink: 0; }
@@ -953,10 +954,12 @@ textarea::placeholder { color: var(--text-muted); }
   background: var(--accent-blue);
   border-radius: 3px;
   transition: width 0.3s ease;
-  font-size: 9px;
-  color: white;
-  text-align: center;
-  line-height: 6px;
+}
+
+.monitor-pct {
+  font-size: 11px;
+  min-width: 28px;
+  text-align: right;
 }
 
 /* ===== Generate/Stop Row ===== */
@@ -964,21 +967,25 @@ textarea::placeholder { color: var(--text-muted); }
 .generate-row {
   display: flex;
   gap: 8px;
+  margin-top: 16px;
+  align-items: stretch;
 }
 
 .generate-row .btn-large {
   flex: 1;
+  margin-top: 0;
 }
 
 .btn-danger {
   background: var(--accent-red);
   color: #fff;
   border: none;
-  padding: 8px 16px;
+  padding: 8px 20px;
   border-radius: var(--radius);
   cursor: pointer;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .btn-danger:hover {

@@ -525,11 +525,7 @@ class DextinityApp {
   }
 
   _onProgress(progress) {
-    const progressBar = document.getElementById('chain-progress');
-    if (progressBar) {
-      progressBar.style.width = `${progress.percent}%`;
-      progressBar.textContent = `${progress.percent}%`;
-    }
+    // Progress display is handled by _onMonitorUpdate to avoid conflicts
   }
 
   _onMonitorUpdate(data) {
@@ -592,13 +588,12 @@ class DextinityApp {
   _updateMonitorDisplay(data) {
     const tokenEl = document.getElementById('monitor-tokens');
     const progressBar = document.getElementById('chain-progress');
+    const progressLabel = document.getElementById('monitor-progress-label');
 
     if (!data) {
       if (tokenEl) tokenEl.textContent = '0';
-      if (progressBar) {
-        progressBar.style.width = '0%';
-        progressBar.textContent = '';
-      }
+      if (progressBar) progressBar.style.width = '0%';
+      if (progressLabel) progressLabel.textContent = '0%';
       return;
     }
 
@@ -607,9 +602,12 @@ class DextinityApp {
       tokenEl.textContent = total.toLocaleString();
     }
 
+    const pct = data.percent || 0;
     if (progressBar) {
-      progressBar.style.width = `${data.percent || 0}%`;
-      progressBar.textContent = data.percent > 5 ? `${data.percent}%` : '';
+      progressBar.style.width = `${pct}%`;
+    }
+    if (progressLabel) {
+      progressLabel.textContent = `${pct}%`;
     }
   }
 

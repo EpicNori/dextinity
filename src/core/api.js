@@ -353,6 +353,14 @@ export class AIApiClient {
     } catch (err) {
       this._lastLatencyMs = Math.round(performance.now() - startTime);
       this._lastError = err.message;
+
+      // Provide friendlier error messages for common issues
+      if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+        const provider = PROVIDERS[this.settings.provider]?.name || this.settings.provider;
+        throw new Error(
+          `Could not reach ${provider} API. Check your internet connection, API key, and ensure the provider allows browser requests (CORS).`
+        );
+      }
       throw err;
     }
   }
