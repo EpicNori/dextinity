@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dextinity - Autonomous Roblox Game Dev</title>
+  <link rel="stylesheet" href="src/ui/styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <div class="header-left">
+        <h1>Dextinity</h1>
+        <span class="subtitle">Autonomous Roblox Game Development</span>
+      </div>
+      <div class="header-right">
+        <button id="btn-settings" class="btn btn-icon" title="API Settings">&#9881;</button>
+        <button id="btn-upload" class="btn btn-secondary">Upload Project</button>
+        <button id="btn-export" class="btn btn-primary" disabled>Export to Roblox</button>
+      </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div id="main">
+      <!-- Left Panel: Input -->
+      <div id="panel-input" class="panel">
+        <div class="panel-header">
+          <h2>Create</h2>
+          <div class="mode-toggle">
+            <button id="mode-vibe" class="mode-btn active" data-mode="vibe">VibeCode</button>
+            <button id="mode-detailed" class="mode-btn" data-mode="detailed">Detailed</button>
+            <button id="mode-upload" class="mode-btn" data-mode="upload">Improve</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <!-- VibeCode Mode -->
+          <div id="input-vibe" class="input-mode active">
+            <label for="vibe-prompt">Describe your game vibe:</label>
+            <textarea id="vibe-prompt" placeholder="Chill simulator with pets and a neon island..."></textarea>
+            <div class="vibe-presets">
+              <span class="preset-label">Quick vibes:</span>
+              <button class="preset-btn" data-vibe="Chill pet simulator with island exploration">Pet Sim</button>
+              <button class="preset-btn" data-vibe="Fast neon obby with checkpoints and leaderboards">Neon Obby</button>
+              <button class="preset-btn" data-vibe="Tycoon with factory building and automation">Tycoon</button>
+              <button class="preset-btn" data-vibe="Horror survival with flashlight and monster AI">Horror</button>
+              <button class="preset-btn" data-vibe="Battle royale with shrinking zone and loot">Battle Royale</button>
+            </div>
+          </div>
+          <!-- Detailed Mode -->
+          <div id="input-detailed" class="input-mode">
+            <label for="detail-prompt">Describe your game in detail:</label>
+            <textarea id="detail-prompt" placeholder="A simulator game where players collect gems, upgrade pickaxes, unlock areas. Include a shop, rebirth system, and pet system with rarities..."></textarea>
+            <div class="detail-options">
+              <label><input type="checkbox" id="opt-datastore" checked> DataStore (saving)</label>
+              <label><input type="checkbox" id="opt-monetization"> Monetization hooks</label>
+              <label><input type="checkbox" id="opt-ui" checked> Custom UI</label>
+              <label><input type="checkbox" id="opt-anticheat"> Anti-cheat</label>
+              <label><input type="checkbox" id="opt-multiplayer" checked> Multiplayer</label>
+            </div>
+          </div>
+          <!-- Upload/Improve Mode -->
+          <div id="input-upload" class="input-mode">
+            <label>Upload existing Roblox project files:</label>
+            <div id="upload-zone" class="upload-zone">
+              <input type="file" id="file-input" multiple accept=".lua,.luau,.json,.rbxlx,.rbxmx" hidden>
+              <p>Drop files here or <button id="browse-btn" class="link-btn">browse</button></p>
+              <p class="upload-hint">Accepts .lua, .luau, .json, .rbxlx, .rbxmx</p>
+            </div>
+            <div id="uploaded-files" class="uploaded-files"></div>
+            <label for="improve-prompt">What should be improved?</label>
+            <textarea id="improve-prompt" placeholder="Optimize performance, fix bugs, add a rebirth system..."></textarea>
+          </div>
+
+          <button id="btn-generate" class="btn btn-primary btn-large">Generate Game</button>
+        </div>
+      </div>
+
+      <!-- Center Panel: Agent Chain -->
+      <div id="panel-agents" class="panel">
+        <div class="panel-header">
+          <h2>Agent Chain</h2>
+          <span id="chain-status" class="status-badge">Idle</span>
+        </div>
+        <div class="panel-body">
+          <div id="agent-chain" class="agent-chain">
+            <div class="agent-node" data-agent="intent">
+              <div class="agent-icon">&#127919;</div>
+              <div class="agent-label">Intent</div>
+              <div class="agent-status">waiting</div>
+            </div>
+            <div class="agent-connector"></div>
+            <div class="agent-node" data-agent="planner">
+              <div class="agent-icon">&#128203;</div>
+              <div class="agent-label">Planner</div>
+              <div class="agent-status">waiting</div>
+            </div>
+            <div class="agent-connector"></div>
+            <div class="agent-node" data-agent="architect">
+              <div class="agent-icon">&#127959;</div>
+              <div class="agent-label">Architect</div>
+              <div class="agent-status">waiting</div>
+            </div>
+            <div class="agent-connector"></div>
+            <div class="agent-node" data-agent="coder">
+              <div class="agent-icon">&#128187;</div>
+              <div class="agent-label">Coder</div>
+              <div class="agent-status">waiting</div>
+            </div>
+            <div class="agent-connector"></div>
+            <div class="agent-node" data-agent="adapter">
+              <div class="agent-icon">&#128268;</div>
+              <div class="agent-label">Roblox Adapter</div>
+              <div class="agent-status">waiting</div>
+            </div>
+            <div class="agent-connector"></div>
+            <div class="agent-node" data-agent="tester">
+              <div class="agent-icon">&#128269;</div>
+              <div class="agent-label">Tester</div>
+              <div class="agent-status">waiting</div>
+            </div>
+            <div class="agent-connector"></div>
+            <div class="agent-node" data-agent="improver">
+              <div class="agent-icon">&#11088;</div>
+              <div class="agent-label">Improver</div>
+              <div class="agent-status">waiting</div>
+            </div>
+          </div>
+
+          <!-- Agent Narration Log -->
+          <div id="agent-log" class="agent-log">
+            <div class="log-header">
+              <h3>Agent Narration</h3>
+              <button id="btn-clear-log" class="btn btn-icon btn-small" title="Clear log">&#128465;</button>
+            </div>
+            <div id="log-entries" class="log-entries">
+              <div class="log-entry log-system">System ready. Configure your API key in settings, then describe your game.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Output -->
+      <div id="panel-output" class="panel">
+        <div class="panel-header">
+          <h2>Output</h2>
+          <div class="output-tabs">
+            <button class="tab-btn active" data-tab="code">Code</button>
+            <button class="tab-btn" data-tab="structure">Structure</button>
+            <button class="tab-btn" data-tab="antigravity">Antigravity</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="tab-code" class="tab-content active">
+            <div id="file-tree" class="file-tree"></div>
+            <div id="code-viewer" class="code-viewer">
+              <pre><code id="code-display">-- Generated Luau code will appear here</code></pre>
+            </div>
+          </div>
+          <div id="tab-structure" class="tab-content">
+            <div id="structure-view" class="structure-view">
+              <p class="placeholder-text">Roblox project structure will appear here after generation.</p>
+            </div>
+          </div>
+          <div id="tab-antigravity" class="tab-content">
+            <div id="antigravity-view" class="code-viewer">
+              <pre><code id="antigravity-display"># Antigravity source will appear here</code></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>API Settings</h2>
+          <button id="btn-close-settings" class="btn btn-icon">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="api-provider">AI Provider</label>
+            <select id="api-provider">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="custom">Custom OpenAI-compatible</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="api-key">API Key</label>
+            <input type="password" id="api-key" placeholder="sk-...">
+            <p class="form-hint">Stored only in your browser's localStorage. Never sent anywhere except the AI provider.</p>
+          </div>
+          <div class="form-group" id="custom-endpoint-group" style="display:none">
+            <label for="api-endpoint">Custom API Endpoint</label>
+            <input type="url" id="api-endpoint" placeholder="https://api.example.com/v1/chat/completions">
+          </div>
+          <div class="form-group">
+            <label for="api-model">Model</label>
+            <input type="text" id="api-model" placeholder="claude-sonnet-4-20250514" value="claude-sonnet-4-20250514">
+          </div>
+          <div class="form-group">
+            <label for="max-iterations">Max Improvement Iterations</label>
+            <input type="number" id="max-iterations" value="3" min="1" max="10">
+          </div>
+          <button id="btn-save-settings" class="btn btn-primary">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload hidden input -->
+    <input type="file" id="project-upload" multiple accept=".lua,.luau,.json,.rbxlx,.rbxmx" hidden>
+  </div>
+
+  <!-- External lib: JSZip for ZIP export (loaded from CDN) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+  <!-- App modules -->
+  <script type="module" src="src/core/api.js"></script>
+  <script type="module" src="src/core/memory.js"></script>
+  <script type="module" src="src/transpiler/antigravity.js"></script>
+  <script type="module" src="src/agents/base-agent.js"></script>
+  <script type="module" src="src/agents/intent-agent.js"></script>
+  <script type="module" src="src/agents/planner-agent.js"></script>
+  <script type="module" src="src/agents/architect-agent.js"></script>
+  <script type="module" src="src/agents/coder-agent.js"></script>
+  <script type="module" src="src/agents/adapter-agent.js"></script>
+  <script type="module" src="src/agents/tester-agent.js"></script>
+  <script type="module" src="src/agents/improver-agent.js"></script>
+  <script type="module" src="src/agents/chain.js"></script>
+  <script type="module" src="src/export/roblox-export.js"></script>
+  <script type="module" src="src/ui/app.js"></script>
+</body>
+</html>
