@@ -111,8 +111,30 @@ Write complete, functional code for each file. No placeholders. No TODOs.
 Every function must be implemented. Include actual game content and logic.
 CRITICAL: Return exactly ${batch.length} files in the "files" array, one for each file listed above.`;
 
-      // Only pass compact context - not the entire input chain
-      const result = await this.callAI(userMessage);
+      let result;
+      try {
+        // Only pass compact context - not the entire input chain
+        result = await this.callAI(userMessage);
+      } catch (err) {
+        // If rate limited or API error, create stubs but don't crash the whole chain
+        this.narrate(`Warning: batch ${batchNum} API error: ${err.message}. Creating placeholder files...`);
+        for (const f of batch) {
+          allFiles.push({
+            path: f.path,
+            scriptType: f.scriptType,
+            luau: `-- Code generation failed (API error). Please re-generate.\n-- File: ${f.path}\n-- Description: ${f.description || 'N/A'}`,
+            antigravity: '',
+            description: f.description || '',
+          });
+        }
+        continue;
+      }
+
+      // If JSON parse returned { raw: ... }, try to extract files from the raw text
+      if (result.raw && !result.files) {
+        this.narrate(`Batch ${batchNum}: AI returned non-JSON. Attempting to extract code...`);
+        result = this._extractFilesFromRaw(result.raw, batch);
+      }
 
       if (result.files && Array.isArray(result.files) && result.files.length > 0) {
         allFiles.push(...result.files);
@@ -173,7 +195,43 @@ For each system, create the appropriate file:
 Write complete, functional code. No placeholders. No TODOs.
 CRITICAL: Return one file per system in the "files" array.`;
 
-      const result = await this.callAI(userMessage);
+      let result;
+      const expectedFiles = batch.map(s => ({
+        path: s.type === 'server' || s.type === 'core'
+          ? `ServerScriptService/Server/${s.name.replace(/[^a-zA-Z0-9]/g, '')}Service.server.lua`
+          : s.type === 'client'
+          ? `StarterPlayer/StarterPlayerScripts/Client/${s.name.replace(/[^a-zA-Z0-9]/g, '')}Controller.client.lua`
+          : `ReplicatedStorage/Shared/${s.name.replace(/[^a-zA-Z0-9]/g, '')}.lua`,
+        scriptType: s.type === 'server' || s.type === 'core' ? 'Script' : s.type === 'client' ? 'LocalScript' : 'ModuleScript',
+        description: s.description,
+      }));
+
+      try {
+        result = await this.callAI(userMessage);
+      } catch (err) {
+        this.narrate(`Warning: batch ${batchNum} API error: ${err.message}. Creating stubs...`);
+        for (const s of batch) {
+          const safeName = s.name.replace(/[^a-zA-Z0-9]/g, '');
+          const isServer = s.type === 'server' || s.type === 'core';
+          const isClient = s.type === 'client';
+          allFiles.push({
+            path: isServer ? `ServerScriptService/Server/${safeName}Service.server.lua`
+              : isClient ? `StarterPlayer/StarterPlayerScripts/Client/${safeName}Controller.client.lua`
+              : `ReplicatedStorage/Shared/${safeName}.lua`,
+            scriptType: isServer ? 'Script' : isClient ? 'LocalScript' : 'ModuleScript',
+            luau: `-- Code generation failed (API error): ${err.message}\n-- System: ${s.name}\n-- Please re-generate this file.`,
+            antigravity: '',
+            description: s.description,
+          });
+        }
+        continue;
+      }
+
+      // If JSON parse returned { raw: ... }, try to extract files from the raw text
+      if (result.raw && !result.files) {
+        this.narrate(`Batch ${batchNum}: AI returned non-JSON. Attempting to extract code...`);
+        result = this._extractFilesFromRaw(result.raw, expectedFiles);
+      }
 
       if (result.files && Array.isArray(result.files) && result.files.length > 0) {
         allFiles.push(...result.files);
@@ -198,5 +256,45 @@ CRITICAL: Return one file per system in the "files" array.`;
 
     this.narrate(`Done coding! Wrote ${allFiles.length} files from plan systems.`);
     return { ...input, files: allFiles };
+  }
+
+  /**
+   * Attempt to extract Luau code files from raw (non-JSON) AI response text.
+   * Looks for fenced code blocks and associates them with expected files.
+   */
+  _extractFilesFromRaw(raw, expectedFiles) {
+    if (!raw || typeof raw !== 'string') return { files: [] };
+
+    // Extract all fenced code blocks (```lua or ``` blocks containing Luau-like code)
+    const codeBlocks = [];
+    const codeRegex = /```(?:lua(?:u)?|)\s*\n?([\s\S]*?)```/gi;
+    let match;
+    while ((match = codeRegex.exec(raw)) !== null) {
+      const code = match[1].trim();
+      if (code.length > 20) { // Skip tiny fragments
+        codeBlocks.push(code);
+      }
+    }
+
+    if (codeBlocks.length === 0) return { files: [] };
+
+    // Match code blocks to expected files (by order if counts match, or assign first blocks)
+    const files = [];
+    for (let i = 0; i < expectedFiles.length; i++) {
+      const f = expectedFiles[i];
+      const code = codeBlocks[i] || codeBlocks[codeBlocks.length - 1] || '';
+      if (code) {
+        files.push({
+          path: f.path,
+          scriptType: f.scriptType,
+          luau: code,
+          antigravity: '',
+          description: f.description || '',
+        });
+      }
+    }
+
+    this.narrate(`Extracted ${files.length} code blocks from raw AI response.`);
+    return { files };
   }
 }

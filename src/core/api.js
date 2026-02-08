@@ -275,6 +275,32 @@ export class AIApiClient {
         const statusMatch = err.message.match(/\((\d+)\)/);
         const status = statusMatch ? parseInt(statusMatch[1]) : 0;
 
+        // For 429 rate limits, use longer backoff and provide better messaging
+        if (status === 429) {
+          // Try to extract retry-after from the error message
+          const retryAfterMatch = err.message.match(/retry.?after[:\s]*(\d+)/i);
+          const retryAfterSecs = retryAfterMatch ? parseInt(retryAfterMatch[1]) : null;
+
+          if (attempt === RETRY_CONFIG.maxRetries) {
+            throw new Error(
+              `${context} rate limit exceeded (429). ` +
+              `You've hit the API rate limit. This often happens with free-tier API keys. ` +
+              `Try again in a few minutes, reduce max iterations in settings, or upgrade your API plan.`
+            );
+          }
+
+          // Use retry-after header value or exponential backoff with longer base for rate limits
+          const delay = retryAfterSecs
+            ? retryAfterSecs * 1000
+            : Math.min(RETRY_CONFIG.baseDelayMs * Math.pow(3, attempt + 1), 30000);
+
+          console.warn(
+            `[Dextinity] ${context} rate limited (429), waiting ${Math.round(delay / 1000)}s before retry ${attempt + 1}/${RETRY_CONFIG.maxRetries}...`
+          );
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+
         const isRetryable = RETRY_CONFIG.retryableStatusCodes.includes(status)
           || err.message.includes('network')
           || err.message.includes('fetch')
@@ -330,7 +356,7 @@ export class AIApiClient {
         );
       } else if (provider === 'gemini') {
         result = await this._withRetry(
-          () => this._callGemini({ systemPrompt, messages, maxTokens, temperature }),
+          () => this._callGemini({ systemPrompt, messages, maxTokens, temperature, jsonMode }),
           'Gemini'
         );
       } else if (provider === 'cohere') {
@@ -416,7 +442,7 @@ export class AIApiClient {
 
   // ---- Google Gemini ----
 
-  async _callGemini({ systemPrompt, messages, maxTokens, temperature }) {
+  async _callGemini({ systemPrompt, messages, maxTokens, temperature, jsonMode }) {
     const model = this.settings.model || PROVIDERS.gemini.defaultModel;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.settings.apiKey}`;
 
@@ -425,12 +451,19 @@ export class AIApiClient {
       parts: [{ text: m.content }],
     }));
 
+    const generationConfig = {
+      maxOutputTokens: maxTokens,
+      temperature,
+    };
+
+    // Enable JSON output mode when requested
+    if (jsonMode) {
+      generationConfig.responseMimeType = 'application/json';
+    }
+
     const body = {
       contents,
-      generationConfig: {
-        maxOutputTokens: maxTokens,
-        temperature,
-      },
+      generationConfig,
     };
 
     if (systemPrompt) {
@@ -451,9 +484,13 @@ export class AIApiClient {
     const data = await response.json();
     this.requestCount++;
 
-    const text = data.candidates?.[0]?.content?.parts
-      ?.map(p => p.text)
-      ?.join('') || '';
+    // Gemini 2.5 thinking models return parts with thought:true for reasoning.
+    // We must filter these out to get only the actual response text.
+    const allParts = data.candidates?.[0]?.content?.parts || [];
+    const responseParts = allParts.filter(p => !p.thought);
+    // If filtering removes everything (shouldn't happen), fall back to all parts
+    const partsToUse = responseParts.length > 0 ? responseParts : allParts;
+    const text = partsToUse.map(p => p.text || '').join('');
 
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;

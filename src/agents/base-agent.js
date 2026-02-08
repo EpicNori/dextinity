@@ -66,6 +66,7 @@ export class BaseAgent {
       messages,
       maxTokens: 8192,
       temperature: 0.7,
+      jsonMode: true,
     });
 
     if (!result || !result.content) {
@@ -78,7 +79,8 @@ export class BaseAgent {
 
   /**
    * Parse AI response, extracting JSON if present.
-   * Uses multiple strategies: fenced JSON block, raw JSON, brace extraction.
+   * Uses multiple strategies: fenced JSON block, raw JSON, brace extraction,
+   * and balanced-brace scanning as a last resort.
    */
   _parseResponse(content) {
     if (!content || typeof content !== 'string') {
@@ -126,8 +128,66 @@ export class BaseAgent {
       }
     }
 
-    // All strategies failed - return as wrapped text
+    // Strategy 5: Balanced-brace extraction - find the first valid JSON object
+    // by tracking brace depth (handles cases where outermost braces span
+    // an invalid region but a valid JSON object exists inside)
+    if (firstBrace !== -1) {
+      const parsed = this._extractBalancedJson(content, firstBrace);
+      if (parsed) return parsed;
+    }
+
+    // All strategies failed - log for debugging
+    console.warn(`[${this.id}] _parseResponse: all strategies failed. Content preview:`, content.substring(0, 300));
     return { raw: content };
+  }
+
+  /**
+   * Extract a balanced JSON object starting from a given position.
+   * Tracks brace depth while respecting string literals.
+   */
+  _extractBalancedJson(content, startIdx) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = startIdx; i < content.length; i++) {
+      const ch = content[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+
+      if (ch === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          try {
+            return JSON.parse(content.substring(startIdx, i + 1));
+          } catch (e) {
+            // This balanced region wasn't valid JSON, try next opening brace
+            const nextBrace = content.indexOf('{', startIdx + 1);
+            if (nextBrace !== -1 && nextBrace < i) {
+              return this._extractBalancedJson(content, nextBrace);
+            }
+            return null;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**
