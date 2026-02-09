@@ -92,11 +92,26 @@ export class CoderAgent extends BaseAgent {
 
       this.narrate(`Writing batch ${batchNum}/${totalBatches}: ${batch.map(f => f.path.split('/').pop()).join(', ')}`);
 
+      // Include creative direction if available
+      let creativeHint = '';
+      if (input.creativeExpansion?.selected) {
+        const ce = input.creativeExpansion;
+        const mechanics = (ce.uniqueMechanics || [])
+          .map(m => `- ${m.name}: ${m.description}`)
+          .join('\n');
+        creativeHint = `
+Creative Direction: ${ce.selected.twist || ''}
+Unique Mechanics:
+${mechanics || '(none)'}
+Player Fantasy: ${ce.playerFantasy || ''}
+`;
+      }
+
       const userMessage = `Write the code for these ${batch.length} files:
 
 Game: ${input.gameTitle} (${input.gameType})
 Core Loop: ${input.coreLoop}
-Vibes: ${(input.vibes || []).join(', ')}
+Vibes: ${(input.vibes || []).join(', ')}${creativeHint}
 
 Files to write:
 ${batch.map(f => `- ${f.path} (${f.scriptType}): ${f.description}\n  Dependencies: ${(f.dependencies || []).join(', ') || 'none'}`).join('\n')}

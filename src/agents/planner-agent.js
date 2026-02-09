@@ -65,6 +65,32 @@ export class PlannerAgent extends BaseAgent {
   async run(input) {
     this.narrate("Time to plan! I'm figuring out all the systems we need...");
 
+    // Build creative context if the Creative Agent expanded the concept
+    let creativeContext = '';
+    if (input.creativeExpansion) {
+      const ce = input.creativeExpansion;
+      const mechanics = (ce.uniqueMechanics || [])
+        .map(m => `- ${m.name}: ${m.description}`)
+        .join('\n');
+      const ideas = (ce.generativeIdeas || [])
+        .map(idea => `- ${idea}`)
+        .join('\n');
+      creativeContext = `
+
+Creative Direction (from Creative Agent):
+Unique Mechanics to implement:
+${mechanics || '(none)'}
+
+Player Fantasy: ${ce.playerFantasy || 'N/A'}
+Visual Style: ${ce.atmosphere?.visualStyle || 'N/A'}
+World Building: ${ce.thematicElements?.worldBuilding || 'N/A'}
+
+Generative Ideas to consider:
+${ideas || '(none)'}
+
+Incorporate these creative elements into the system design where they add genuine gameplay value.`;
+    }
+
     const userMessage = `Plan the systems for this game:
 
 Game Title: ${input.gameTitle}
@@ -72,7 +98,7 @@ Game Type: ${input.gameType}
 Core Loop: ${input.coreLoop}
 Vibes: ${(input.vibes || []).join(', ')}
 Target Systems: ${(input.targetSystems || []).join(', ')}
-Complexity: ${input.complexity}
+Complexity: ${input.complexity}${creativeContext}
 
 Break this down into specific Roblox systems with clear responsibilities and data flow.
 Make sure every system is accounted for and nothing critical is missing.`;
