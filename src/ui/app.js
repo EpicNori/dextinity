@@ -57,6 +57,12 @@ class DextinityApp {
       input.type = input.type === 'password' ? 'text' : 'password';
     });
 
+    // Creativity slider
+    const creativitySlider = document.getElementById('creativity-slider');
+    if (creativitySlider) {
+      creativitySlider.addEventListener('input', () => this._updateCreativityLabel());
+    }
+
     // Build provider grid
     this._buildProviderGrid();
     this._buildModelButtons();
@@ -123,6 +129,13 @@ class DextinityApp {
     document.getElementById('api-endpoint').value = settings.endpoint || '';
     document.getElementById('api-model').value = settings.model;
     document.getElementById('max-iterations').value = settings.maxIterations;
+
+    // Creativity slider
+    const creativitySlider = document.getElementById('creativity-slider');
+    if (creativitySlider) {
+      creativitySlider.value = Math.round((settings.creativity || 0.5) * 100);
+      this._updateCreativityLabel();
+    }
 
     this._updateProviderSelection(settings.provider);
     this._buildModelButtons();
@@ -239,6 +252,22 @@ class DextinityApp {
     }
   }
 
+  _updateCreativityLabel() {
+    const slider = document.getElementById('creativity-slider');
+    const label = document.getElementById('creativity-label');
+    if (!slider || !label) return;
+
+    const value = parseInt(slider.value);
+    let levelName;
+    if (value < 20) levelName = 'Minimal';
+    else if (value < 40) levelName = 'Conservative';
+    else if (value < 60) levelName = 'Balanced';
+    else if (value < 80) levelName = 'Adventurous';
+    else levelName = 'Unhinged';
+
+    label.textContent = `${levelName} (${value}%)`;
+  }
+
   async _testConnection() {
     const resultEl = document.getElementById('connection-result');
     const btn = document.getElementById('btn-test-connection');
@@ -265,12 +294,16 @@ class DextinityApp {
   }
 
   _applySettingsToClient() {
+    const creativitySlider = document.getElementById('creativity-slider');
+    const creativity = creativitySlider ? parseInt(creativitySlider.value) / 100 : 0.5;
+
     apiClient.saveSettings({
       provider: this._selectedProvider || 'anthropic',
       apiKey: document.getElementById('api-key').value,
       endpoint: document.getElementById('api-endpoint').value,
       model: document.getElementById('api-model').value,
       maxIterations: parseInt(document.getElementById('max-iterations').value) || 3,
+      creativity,
     });
   }
 

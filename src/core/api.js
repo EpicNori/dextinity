@@ -199,6 +199,7 @@ const DEFAULT_SETTINGS = {
   endpoint: '',
   model: 'claude-sonnet-4-20250514',
   maxIterations: 3,
+  creativity: 0.5,
 };
 
 // ---- Retry Configuration ----

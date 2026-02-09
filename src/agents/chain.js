@@ -7,6 +7,7 @@
  */
 
 import { IntentAgent } from './intent-agent.js';
+import { CreativeAgent } from './creative-agent.js';
 import { PlannerAgent } from './planner-agent.js';
 import { ArchitectAgent } from './architect-agent.js';
 import { CoderAgent } from './coder-agent.js';
@@ -48,6 +49,7 @@ export class AgentChain {
 
     this.agents = {
       intent: new IntentAgent(onNarrate),
+      creative: new CreativeAgent(onNarrate),
       planner: new PlannerAgent(onNarrate),
       architect: new ArchitectAgent(onNarrate),
       coder: new CoderAgent(onNarrate),
@@ -56,7 +58,7 @@ export class AgentChain {
       improver: new ImproverAgent(onNarrate),
     };
 
-    this.agentOrder = ['intent', 'planner', 'architect', 'coder', 'adapter', 'tester', 'improver'];
+    this.agentOrder = ['intent', 'creative', 'planner', 'architect', 'coder', 'adapter', 'tester', 'improver'];
   }
 
   // ==== Monitoring ====
@@ -210,7 +212,7 @@ export class AgentChain {
     this.isRunning = true;
     this._aborted = false;
     const maxIterations = apiClient.getSettings().maxIterations || 3;
-    // 7 agents + up to (maxIterations - 1) extra tester+improver pairs
+    // 8 agents + up to (maxIterations - 1) extra tester+improver pairs
     this._resetMonitor(this.agentOrder.length + (maxIterations - 1) * 2);
     this.callbacks.onChainStart?.();
 
@@ -297,9 +299,9 @@ export class AgentChain {
       // Intent (to understand improvement goals)
       context = await this._runAgent('intent', context);
 
-      // Skip planner/architect/coder since we have existing files
+      // Skip creative/planner/architect/coder since we have existing files
       // Notify that these were skipped (not done) so UI can show correct state
-      for (const skip of ['planner', 'architect', 'coder']) {
+      for (const skip of ['creative', 'planner', 'architect', 'coder']) {
         this.callbacks.onAgentSkipped?.(skip);
       }
 

@@ -471,6 +471,7 @@ textarea::placeholder { color: var(--text-muted); }
 
 .log-system { color: var(--text-muted); }
 .log-intent { color: var(--accent-pink); }
+.log-creative { color: #f0c674; }
 .log-planner { color: var(--accent-orange); }
 .log-architect { color: var(--accent-purple); }
 .log-coder { color: var(--accent-blue); }
@@ -994,4 +995,82 @@ textarea::placeholder { color: var(--text-muted); }
 
 .hidden {
   display: none !important;
+}
+
+/* ===== Creative Agent Node ===== */
+
+.agent-node-creative {
+  border-color: #f0c674;
+  background: rgba(240, 198, 116, 0.04);
+}
+
+.agent-node-creative.active {
+  border-color: #f0c674;
+  background: rgba(240, 198, 116, 0.1);
+  box-shadow: 0 0 12px rgba(240, 198, 116, 0.2);
+}
+
+.agent-node-creative.active .agent-status { color: #f0c674; }
+
+.agent-node-creative.done {
+  border-color: var(--accent-green);
+  background: rgba(63, 185, 80, 0.06);
+}
+
+/* ===== Creativity Slider ===== */
+
+.creativity-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.creativity-slider-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  outline: none;
+}
+
+.creativity-slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f0c674;
+  cursor: pointer;
+  border: 2px solid var(--bg-secondary);
+  box-shadow: 0 0 6px rgba(240, 198, 116, 0.4);
+}
+
+.creativity-slider-row input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f0c674;
+  cursor: pointer;
+  border: 2px solid var(--bg-secondary);
+  box-shadow: 0 0 6px rgba(240, 198, 116, 0.4);
+}
+
+.creativity-label {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: #f0c674;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 110px;
+  text-align: right;
+}
+
+.creativity-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 2px 2px 0;
 }

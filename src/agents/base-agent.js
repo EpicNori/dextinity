@@ -40,9 +40,10 @@ export class BaseAgent {
    * Call the AI with a structured prompt and parse JSON response.
    * @param {string} userMessage - The user-facing message/prompt
    * @param {object} [context] - Additional context from previous agents
+   * @param {object} [options] - Optional overrides (e.g., { temperature: 0.9 })
    * @returns {Promise<object>} Parsed JSON response
    */
-  async callAI(userMessage, context = {}) {
+  async callAI(userMessage, context = {}, options = {}) {
     const contextKeys = Object.keys(context);
     let contextStr = '';
     if (contextKeys.length > 0) {
@@ -65,7 +66,7 @@ export class BaseAgent {
       systemPrompt: this.systemPrompt,
       messages,
       maxTokens: 8192,
-      temperature: 0.7,
+      temperature: options.temperature ?? 0.7,
       jsonMode: true,
     });
 

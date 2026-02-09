@@ -93,6 +93,12 @@
               <div class="agent-status">waiting</div>
             </div>
             <div class="agent-connector"></div>
+            <div class="agent-node agent-node-creative" data-agent="creative">
+              <div class="agent-icon">&#9889;</div>
+              <div class="agent-label">Creative</div>
+              <div class="agent-status">waiting</div>
+            </div>
+            <div class="agent-connector"></div>
             <div class="agent-node" data-agent="planner">
               <div class="agent-icon">&#128203;</div>
               <div class="agent-label">Planner</div>
@@ -238,6 +244,21 @@
             <p id="model-context-hint" class="form-hint"></p>
           </div>
 
+          <!-- Creativity Level -->
+          <div class="form-group">
+            <label for="creativity-slider">Creativity Level</label>
+            <div class="creativity-slider-row">
+              <input type="range" id="creativity-slider" min="0" max="100" value="50" step="5">
+              <span id="creativity-label" class="creativity-label">Balanced (50%)</span>
+            </div>
+            <div class="creativity-scale">
+              <span>Faithful</span>
+              <span>Balanced</span>
+              <span>Unhinged</span>
+            </div>
+            <p class="form-hint">Controls how creatively the AI expands your game concepts. Higher = wilder ideas.</p>
+          </div>
+
           <!-- Max Iterations -->
           <div class="form-group">
             <label for="max-iterations">Max Improvement Iterations</label>
@@ -269,6 +290,7 @@
   <script type="module" src="src/transpiler/antigravity.js"></script>
   <script type="module" src="src/agents/base-agent.js"></script>
   <script type="module" src="src/agents/intent-agent.js"></script>
+  <script type="module" src="src/agents/creative-agent.js"></script>
   <script type="module" src="src/agents/planner-agent.js"></script>
   <script type="module" src="src/agents/architect-agent.js"></script>
   <script type="module" src="src/agents/coder-agent.js"></script>
