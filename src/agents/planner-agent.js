@@ -58,6 +58,7 @@ export class PlannerAgent extends BaseAgent {
       id: 'planner',
       description: 'Breaks intent into concrete systems and modules',
       systemPrompt: SYSTEM_PROMPT,
+      maxTokens: 12288,
       onNarrate,
     });
   }

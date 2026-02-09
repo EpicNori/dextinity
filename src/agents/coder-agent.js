@@ -61,6 +61,7 @@ export class CoderAgent extends BaseAgent {
       id: 'coder',
       description: 'Writes functional Antigravity and Luau code',
       systemPrompt: SYSTEM_PROMPT,
+      maxTokens: 16384,
       onNarrate,
     });
   }

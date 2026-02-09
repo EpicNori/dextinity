@@ -74,6 +74,7 @@ export class TesterAgent extends BaseAgent {
       id: 'tester',
       description: 'Simulates play sessions and identifies issues',
       systemPrompt: SYSTEM_PROMPT,
+      maxTokens: 12288,
       onNarrate,
     });
   }
