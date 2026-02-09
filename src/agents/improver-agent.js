@@ -59,6 +59,7 @@ export class ImproverAgent extends BaseAgent {
       id: 'improver',
       description: 'Refactors, fixes, and upgrades based on test results',
       systemPrompt: SYSTEM_PROMPT,
+      maxTokens: 16384,
       onNarrate,
     });
   }

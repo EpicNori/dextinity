@@ -56,6 +56,7 @@ export class AdapterAgent extends BaseAgent {
       id: 'adapter',
       description: 'Validates and fixes Roblox compatibility',
       systemPrompt: SYSTEM_PROMPT,
+      maxTokens: 16384,
       onNarrate,
     });
   }

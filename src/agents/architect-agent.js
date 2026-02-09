@@ -98,6 +98,7 @@ export class ArchitectAgent extends BaseAgent {
       id: 'architect',
       description: 'Designs folder structure and file layout for Roblox',
       systemPrompt: SYSTEM_PROMPT,
+      maxTokens: 12288,
       onNarrate,
     });
   }

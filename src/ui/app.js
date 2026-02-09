@@ -110,7 +110,7 @@ class DextinityApp {
   _initChain() {
     this.chain = new AgentChain({
       onAgentStart: (id) => this._onAgentStart(id),
-      onAgentDone: (id) => this._onAgentDone(id),
+      onAgentDone: (id, result) => this._onAgentDone(id, result),
       onAgentError: (id, err) => this._onAgentError(id, err),
       onAgentSkipped: (id) => this._onAgentSkipped(id),
       onNarrate: (entry) => this._onNarrate(entry),
@@ -503,7 +503,7 @@ class DextinityApp {
     }
   }
 
-  _onAgentDone(id) {
+  _onAgentDone(id, result) {
     const node = document.querySelector(`[data-agent="${id}"]`);
     if (node) {
       node.classList.remove('active');
@@ -523,6 +523,54 @@ class DextinityApp {
     const idx = nodeArray.findIndex(n => n.dataset.agent === id);
     if (idx >= 0 && idx < connectors.length) {
       connectors[idx].classList.add('done');
+    }
+
+    // Live preview: if this agent produced files, render them immediately
+    // This lets users watch code appear and evolve through the pipeline
+    if (result?.files?.length > 0) {
+      this._livePreviewUpdate(result, id);
+    }
+  }
+
+  /**
+   * Update the code preview with intermediate results as agents complete.
+   * Shows the current state of generated code in real-time.
+   */
+  _livePreviewUpdate(result, agentId) {
+    // Switch to Code tab so the user sees it happening
+    this._setTab('code');
+
+    const fileCount = result.files.length;
+    const label = agentId === 'coder' ? 'Code generated'
+      : agentId === 'adapter' ? 'Code validated'
+      : agentId === 'improver' ? 'Code improved'
+      : 'Files updated';
+    this._addLog('system', 'System', `${label}: ${fileCount} files now in preview`);
+
+    try {
+      this._renderFileTree(result);
+    } catch (err) {
+      console.error('Live preview: file tree render failed:', err);
+    }
+
+    // Display the first file (or keep the currently selected file)
+    const activeTreeItem = document.querySelector('.tree-item.active');
+    if (activeTreeItem) {
+      // Find and re-display the currently selected file
+      const activePath = activeTreeItem.textContent.trim();
+      const matchedFile = result.files.find(f => {
+        const fileName = f.path.split('/').pop();
+        return activePath.includes(fileName);
+      });
+      if (matchedFile) {
+        this._displayFile(matchedFile);
+        return;
+      }
+    }
+
+    // Default: show first file
+    if (result.files.length > 0) {
+      this._displayFile(result.files[0]);
     }
   }
 

@@ -14,6 +14,7 @@ export class BaseAgent {
    * @param {string} config.id - Agent identifier (intent, planner, etc.)
    * @param {string} config.description - What this agent does
    * @param {string} config.systemPrompt - System prompt for the AI
+   * @param {number} [config.maxTokens] - Max response tokens (default 8192)
    * @param {function} [config.onNarrate] - Callback for narration logging
    */
   constructor(config) {
@@ -21,6 +22,7 @@ export class BaseAgent {
     this.id = config.id;
     this.description = config.description;
     this.systemPrompt = config.systemPrompt;
+    this.maxTokens = config.maxTokens || 8192;
     this.onNarrate = config.onNarrate || (() => {});
   }
 
@@ -65,7 +67,7 @@ export class BaseAgent {
     const result = await apiClient.call({
       systemPrompt: this.systemPrompt,
       messages,
-      maxTokens: 8192,
+      maxTokens: options.maxTokens ?? this.maxTokens,
       temperature: options.temperature ?? 0.7,
       jsonMode: true,
     });
@@ -137,9 +139,98 @@ export class BaseAgent {
       if (parsed) return parsed;
     }
 
+    // Strategy 6: Repair truncated JSON - the response was likely cut off by maxTokens
+    // Close any open strings, arrays, and objects to salvage partial data
+    if (firstBrace !== -1) {
+      const repaired = this._repairTruncatedJson(content, firstBrace);
+      if (repaired) {
+        console.info(`[${this.id}] Repaired truncated JSON response`);
+        return repaired;
+      }
+    }
+
     // All strategies failed - log for debugging
     console.warn(`[${this.id}] _parseResponse: all strategies failed. Content preview:`, content.substring(0, 300));
     return { raw: content };
+  }
+
+  /**
+   * Attempt to repair truncated JSON by closing unclosed strings, arrays, and objects.
+   * This handles the common case where the AI response is cut off by the token limit.
+   */
+  _repairTruncatedJson(content, startIdx) {
+    let json = content.substring(startIdx);
+
+    // Track parser state
+    let inString = false;
+    let escape = false;
+    const stack = []; // tracks open delimiters: '}' or ']'
+
+    for (let i = 0; i < json.length; i++) {
+      const ch = json[i];
+
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (ch === '{') stack.push('}');
+      else if (ch === '[') stack.push(']');
+      else if (ch === '}' || ch === ']') {
+        if (stack.length > 0 && stack[stack.length - 1] === ch) {
+          stack.pop();
+        }
+      }
+    }
+
+    // If nothing is unclosed, this isn't a truncation issue
+    if (stack.length === 0 && !inString) return null;
+
+    // Close the open string if needed
+    if (inString) {
+      json += '"';
+    }
+
+    // Remove any trailing incomplete key-value pair or comma
+    // (e.g., `"key": "incomplete` or `, "key":`)
+    json = json.replace(/,\s*"[^"]*"\s*:\s*"?[^"{}[\]]*$/, '');
+    json = json.replace(/,\s*$/, '');
+
+    // Re-scan for open delimiters after cleanup
+    inString = false;
+    escape = false;
+    stack.length = 0;
+
+    for (let i = 0; i < json.length; i++) {
+      const ch = json[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\' && inString) { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === '{') stack.push('}');
+      else if (ch === '[') stack.push(']');
+      else if (ch === '}' || ch === ']') {
+        if (stack.length > 0 && stack[stack.length - 1] === ch) stack.pop();
+      }
+    }
+
+    if (inString) json += '"';
+
+    // Close all remaining open delimiters
+    while (stack.length > 0) {
+      json += stack.pop();
+    }
+
+    try {
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
   }
 
   /**

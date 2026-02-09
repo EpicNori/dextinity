@@ -175,7 +175,7 @@ export class AgentChain {
     try {
       const result = await this.agents[agentId].run(context);
       this._monitorAgentEnd(agentId);
-      this.callbacks.onAgentDone?.(agentId);
+      this.callbacks.onAgentDone?.(agentId, result);
       return result;
     } catch (err) {
       this._monitorAgentEnd(agentId);
