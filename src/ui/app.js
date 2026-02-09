@@ -684,19 +684,40 @@ class DextinityApp {
   _renderOutput(project) {
     const files = project.files || [];
 
+    // Ensure the Code tab is visible
+    this._setTab('code');
+
     if (files.length === 0) {
       // No files generated - show a clear message in the code display
       const display = document.getElementById('code-display');
-      display.textContent = '-- No files were generated.\n-- This can happen if the AI returned an unexpected response format.\n-- Try generating again, or check the agent log for errors.';
+      if (display) {
+        display.textContent = '-- No files were generated.\n-- This can happen if the AI returned an unexpected response format.\n-- Try generating again, or check the agent log for errors.';
+      }
       this._addLog('error', 'System', 'No code files were produced. The AI may have returned an unexpected response. Try generating again.');
       return;
     }
 
-    this._renderFileTree(project);
-    this._renderStructureView(project);
-    this._renderAntigravityView(project);
+    // Render each section defensively - one failure shouldn't block the others
+    try {
+      this._renderFileTree(project);
+    } catch (err) {
+      console.error('Failed to render file tree:', err);
+      this._addLog('error', 'System', `File tree rendering failed: ${err.message}`);
+    }
 
-    // Auto-select first file
+    try {
+      this._renderStructureView(project);
+    } catch (err) {
+      console.error('Failed to render structure view:', err);
+    }
+
+    try {
+      this._renderAntigravityView(project);
+    } catch (err) {
+      console.error('Failed to render antigravity view:', err);
+    }
+
+    // Display the first file's code
     if (files.length > 0) {
       this._displayFile(files[0]);
     }
@@ -705,6 +726,7 @@ class DextinityApp {
   _renderFileTree(project) {
     const files = project.files || [];
     const container = document.getElementById('file-tree');
+    if (!container) return;
     container.innerHTML = '';
 
     const tree = robloxExporter.buildFileTree(files);
@@ -712,7 +734,11 @@ class DextinityApp {
   }
 
   _renderTreeNode(container, node, depth, files) {
+    if (!node || typeof node !== 'object') return;
+
     for (const [name, value] of Object.entries(node)) {
+      if (!value) continue;
+
       const div = document.createElement('div');
       div.className = `tree-item tree-indent-${Math.min(depth, 3)}`;
 
@@ -741,11 +767,21 @@ class DextinityApp {
 
   _displayFile(file) {
     const display = document.getElementById('code-display');
-    display.textContent = file.luau || '-- No code generated';
+    if (!display) {
+      console.error('code-display element not found');
+      return;
+    }
+    if (!file) {
+      display.textContent = '-- No file selected';
+      return;
+    }
+    display.textContent = file.luau || '-- No code generated for this file';
   }
 
   _renderStructureView(project) {
     const container = document.getElementById('structure-view');
+    if (!container) return;
+
     const items = robloxExporter.buildStructureView(project);
 
     if (items.length === 0) {
@@ -758,10 +794,10 @@ class DextinityApp {
         <span class="struct-type">${this._escapeHtml(service.name)}</span>
         <span class="struct-desc">${this._escapeHtml(service.description)}</span>
       </div>
-      ${service.children.map(child => `
+      ${(service.children || []).map(child => `
         <div class="structure-item" style="margin-left: 16px;">
-          <span class="struct-type">${this._escapeHtml(child.type)}</span>
-          <span class="struct-name">${this._escapeHtml(child.name)}</span>
+          <span class="struct-type">${this._escapeHtml(child.type || '')}</span>
+          <span class="struct-name">${this._escapeHtml(child.name || '')}</span>
           <span class="struct-desc">${this._escapeHtml(child.description || '')}</span>
         </div>
       `).join('')}
@@ -772,6 +808,7 @@ class DextinityApp {
     const files = project.files || [];
     const agFiles = files.filter(f => f.antigravity);
     const display = document.getElementById('antigravity-display');
+    if (!display) return;
 
     if (agFiles.length === 0) {
       display.textContent = '# No Antigravity source available';
