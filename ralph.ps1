@@ -1,27 +1,35 @@
 param (
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$Goal
 )
 
 # Antigravity Ralph Wiggum Loop
 # Based on antigravity-ralfwiggum-loop.skill
 
+$LogFile = "ralph_loop_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+Write-Host "� Logging output to: $LogFile" -ForegroundColor Gray
+
 while ($true) {
-    Write-Host "🚀 Starting Iteration... Goal: $Goal" -ForegroundColor Cyan
+    $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $Header = "`n[$Timestamp] 🚀 Starting Iteration... Goal: $Goal`n" + "-" * 50
     
-    # Execute Antigravity Agent
-    # We use 'cmd /c' to ensure we can catch the exit code properly if it's a batch file or similar wrapper
-    # Assuming 'ag' is available in the PATH.
-    # If this is specifically for this project context where 'ag' might not be installed globally,
-    # user might need to adjust the command.
-    
-    & ag task "$Goal" --non-interactive --verify
+    Write-Host $Header -ForegroundColor Cyan
+    Add-Content -Path $LogFile -Value $Header
+
+    # Execute Antigravity Agent via local CLI
+    # Redirect stderr to stdout (2>&1) and pipe to Tee-Object to save to file + show on screen
+    node cli.js task "$Goal" 2>&1 | Tee-Object -FilePath $LogFile -Append
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ Task successfully completed!" -ForegroundColor Green
+        $SuccessMsg = "`n✅ Task successfully completed!"
+        Write-Host $SuccessMsg -ForegroundColor Green
+        Add-Content -Path $LogFile -Value $SuccessMsg
         break
-    } else {
-        Write-Host "🔄 Iteration finished, restarting for refinement..." -ForegroundColor Yellow
+    }
+    else {
+        $RetryMsg = "`n🔄 Iteration finished, restarting for refinement..."
+        Write-Host $RetryMsg -ForegroundColor Yellow
+        Add-Content -Path $LogFile -Value $RetryMsg
         Start-Sleep -Seconds 2
     }
 }

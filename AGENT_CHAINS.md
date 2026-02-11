@@ -69,6 +69,30 @@ The `AgentChain` supports two main modes:
     -   Sequence: `Intent -> Adapter -> Tester -> Improver`.
     -   Skips creative/architect phases to focus on analysis and fixing.
 
+## Logging and Output
+
+To debug or audit the agent chain, you should capture the output of each agent.
+
+### 1. In the Ralph Wiggum Loop
+The `ralph.ps1` script automatically creates a log file (e.g., `ralph_loop_YYYYMMDD_HHMMSS.log`) for every session, capturing all console output, plans, and code generation events.
+
+### 2. Programmatic Logging
+When using `AgentChain` in code, use the `onNarrate` callback to write to a file:
+
+```javascript
+import fs from 'fs';
+
+const logStream = fs.createWriteStream('agent_chain.log', { flags: 'a' });
+
+const callbacks = {
+  onNarrate: (entry) => {
+    const logLine = `[${new Date(entry.timestamp).toISOString()}] [${entry.agentName}]: ${entry.message}\n`;
+    console.log(logLine.trim());
+    logStream.write(logLine);
+  }
+};
+```
+
 ## Extending the Chain
 
 To add a new agent:

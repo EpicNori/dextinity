@@ -15,6 +15,7 @@ class DextinityApp {
     this.uploadedFiles = [];
     this.chain = null;
     this._monitorInterval = null;
+    this._dirHandle = null; // For direct file writing
 
     this._initUI();
     this._initChain();
@@ -69,6 +70,9 @@ class DextinityApp {
 
     // Export
     document.getElementById('btn-export').addEventListener('click', () => this._export());
+
+    // Select Output Folder
+    document.getElementById('btn-select-folder').addEventListener('click', () => this._selectOutputFolder());
 
     // Upload
     document.getElementById('btn-upload').addEventListener('click', () => {
@@ -344,6 +348,73 @@ class DextinityApp {
     this._addLog('system', 'System', `Settings saved. Provider: ${name} | Model: ${apiClient.getSettings().model}`);
   }
 
+  // ==== Auto Save (Browser FS Access) ====
+
+  async _selectOutputFolder() {
+    try {
+      if (!window.showDirectoryPicker) {
+        alert('Your browser does not support direct folder access. Please use Chrome or Edge.');
+        return;
+      }
+      // Explicitly request readwrite mode
+      this._dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+
+      this._addLog('system', 'System', `Output folder selected: ${this._dirHandle.name}`);
+      document.getElementById('btn-select-folder').classList.add('btn-success');
+      document.getElementById('btn-select-folder').textContent = `📂 ${this._dirHandle.name}`;
+
+      // If we already have a project, save it now
+      if (this.project && this.project.files?.length > 0) {
+        await this._autoSaveFiles(this.project.files);
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Failed to select folder:', err);
+        this._addLog('error', 'System', `Folder selection failed: ${err.message}`);
+      }
+    }
+  }
+
+  async _autoSaveFiles(files) {
+    if (!this._dirHandle) return;
+
+    // Check for permissions
+    const options = { mode: 'readwrite' };
+    if ((await this._dirHandle.queryPermission(options)) !== 'granted') {
+      const request = await this._dirHandle.requestPermission(options);
+      if (request !== 'granted') {
+        this._addLog('error', 'System', 'Permission denied to write files.');
+        return;
+      }
+    }
+
+    this._addLog('system', 'System', `Auto-saving ${files.length} files to disk...`);
+
+    try {
+      for (const file of files) {
+        // file.path examples: "src/server/init.server.lua", "Workspace/Part.json"
+        const pathParts = file.path.split('/');
+        const fileName = pathParts.pop();
+
+        // Navigate/create directories
+        let currentHandle = this._dirHandle;
+        for (const part of pathParts) {
+          currentHandle = await currentHandle.getDirectoryHandle(part, { create: true });
+        }
+
+        // Write file
+        const fileHandle = await currentHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(file.luau || file.content || '');
+        await writable.close();
+      }
+      this._addLog('system', 'System', '✅ Files auto-saved successfully.');
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      this._addLog('error', 'System', `Auto-save failed: ${err.message}`);
+    }
+  }
+
   // ==== File Upload ====
 
   _handleUpload(event) {
@@ -529,6 +600,11 @@ class DextinityApp {
     // This lets users watch code appear and evolve through the pipeline
     if (result?.files?.length > 0) {
       this._livePreviewUpdate(result, id);
+
+      // Real-time auto-save if folder is selected
+      if (this._dirHandle) {
+        this._autoSaveFiles(result.files);
+      }
     }
   }
 
@@ -543,8 +619,8 @@ class DextinityApp {
     const fileCount = result.files.length;
     const label = agentId === 'coder' ? 'Code generated'
       : agentId === 'adapter' ? 'Code validated'
-      : agentId === 'improver' ? 'Code improved'
-      : 'Files updated';
+        : agentId === 'improver' ? 'Code improved'
+          : 'Files updated';
     this._addLog('system', 'System', `${label}: ${fileCount} files now in preview`);
 
     try {
@@ -631,6 +707,11 @@ class DextinityApp {
       );
     } else {
       this._addLog('system', 'System', `Generation complete! ${result.files?.length || 0} files ready. Click "Export to Roblox" to download.`);
+    }
+
+    // Auto-save if folder is selected
+    if (result.files?.length > 0 && this._dirHandle) {
+      this._autoSaveFiles(result.files);
     }
 
     // Render output
@@ -798,7 +879,7 @@ class DextinityApp {
       } else {
         const icon = value.scriptType === 'Script' ? '&#128309;'
           : value.scriptType === 'LocalScript' ? '&#128310;'
-          : '&#128311;';
+            : '&#128311;';
         div.innerHTML = `<span class="tree-icon">${icon}</span> ${this._escapeHtml(name)}`;
         div.addEventListener('click', () => {
           const file = files.find(f => f.path === value.path);
